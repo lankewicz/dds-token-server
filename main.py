@@ -152,13 +152,13 @@ def generate_tokens(payload: TokenRequest):
             privilege_expire=expire_ts,
         )
 
-        rtm_token = RtmTokenBuilder.build_token(
+        rtm_token = build_rtm_token_compat(
             APP_ID,
             APP_CERTIFICATE,
             user_account,
-            Role_Rtm_User,
             expire_ts
         )
+
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Failed to generate tokens: {e}")
 
@@ -175,6 +175,45 @@ def generate_tokens(payload: TokenRequest):
 # ==========================================================
 # Funções auxiliares
 # ==========================================================
+
+ 
+def build_rtm_token_compat(
+    app_id: str,
+    app_cert: str,
+    user_account: str,
+    expire_ts: int,
+):
+    """
+    Compatibilidade entre versões do AgoraDynamicKey:
+    Algumas versões expõem:
+      - RtmTokenBuilder.build_token(...)
+    Outras expõem:
+      - RtmTokenBuilder.buildToken(...)
+      - RtmTokenBuilder.buildTokenWithUserAccount(...)
+    """
+    # 1) build_token(appId, appCertificate, userAccount, role, privilegeExpiredTs)
+    if hasattr(RtmTokenBuilder, "build_token"):
+        return RtmTokenBuilder.build_token(
+            app_id, app_cert, user_account, Role_Rtm_User, expire_ts
+        )
+
+    # 2) buildToken(appId, appCertificate, userAccount, role, privilegeExpiredTs)
+    if hasattr(RtmTokenBuilder, "buildToken"):
+        return RtmTokenBuilder.buildToken(
+            app_id, app_cert, user_account, Role_Rtm_User, expire_ts
+        )
+
+    # 3) buildTokenWithUserAccount(appId, appCertificate, userAccount, role, privilegeExpiredTs)
+    if hasattr(RtmTokenBuilder, "buildTokenWithUserAccount"):
+        return RtmTokenBuilder.buildTokenWithUserAccount(
+            app_id, app_cert, user_account, Role_Rtm_User, expire_ts
+        )
+
+    raise RuntimeError(
+        "RtmTokenBuilder não possui métodos conhecidos (build_token/buildToken/buildTokenWithUserAccount). "
+        "Verifique a versão do agora_src/RtmTokenBuilder.py."
+    )
+
 
 def map_role(client_role: ClientRole):
     """
@@ -275,11 +314,10 @@ def generate_rtm_token(payload: TokenRequest):
         user_account = (payload.user_account or str(payload.uid)).strip()
         if not user_account:
             raise ValueError("user_account cannot be empty.")
-        rtm_token = RtmTokenBuilder.build_token(
+        rtm_token = build_rtm_token_compat(
             APP_ID,
             APP_CERTIFICATE,
             user_account,
-            Role_Rtm_User,
             expire_ts
         )
 
