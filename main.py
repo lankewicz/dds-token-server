@@ -60,6 +60,11 @@ class TokenRequest(BaseModel):
         le=24 * 60 * 60,
         description="Tempo de expiração em segundos (min 60, máx 86400)"
     )
+    user_account: str | None = Field(
+        None,
+        min_length=1,
+        description="(Opcional) Identidade RTM (string). Se omitido, usa uid como string."
+    )
     # opcional: header lógico de quem chama
     api_key: str | None = Field(
         None,
@@ -81,6 +86,15 @@ class RtmTokenResponse(BaseModel):
     now: int
     uid: int    
 
+class CombinedTokenResponse(BaseModel):
+    rtc_token: str
+    rtm_token: str
+    expire_at: int
+    now: int
+    channel: str
+    uid: int
+    role: ClientRole
+    user_account: str
 
 # ==========================================================
 # Inicialização FastAPI
@@ -97,7 +111,67 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==========================================================
+# Endpoint: geração COMBINADA (RTC + RTM) – recomendado pro app
+# ==========================================================
 
+@app.post("/token", response_model=CombinedTokenResponse, tags=["rtc", "rtm"])
+def generate_tokens(payload: TokenRequest):
+    """
+    Gera tokens de RTC + RTM em uma única chamada:
+    - RTC: entrar no canal e publicar/assistir (conforme role)
+    - RTM/Signaling: presença confiável e eventos (JOIN/LEAVE/HEARTBEAT etc.)
+    """
+    validate_api_key(payload.api_key)
+
+    channel = payload.channel.strip()
+    if not channel:
+        raise HTTPException(status_code=400, detail="Channel name cannot be empty.")
+
+    uid = payload.uid
+    if uid < 0:
+        raise HTTPException(status_code=400, detail="UID must be >= 0.")
+
+    agora_role = map_role(payload.role)
+
+    now_ts = int(time.time())
+    expire_ts = now_ts + payload.expire_seconds
+
+    user_account = (payload.user_account or str(uid)).strip()
+    if not user_account:
+        raise HTTPException(status_code=400, detail="user_account cannot be empty when provided.")
+
+    try:
+        rtc_token = RtcTokenBuilder.build_token_with_uid(
+            APP_ID,
+            APP_CERTIFICATE,
+            channel,
+            uid,
+            agora_role,
+            token_expire=expire_ts,
+            privilege_expire=expire_ts,
+        )
+
+        rtm_token = RtmTokenBuilder.build_token(
+            APP_ID,
+            APP_CERTIFICATE,
+            user_account,
+            Role_Rtm_User,
+            expire_ts
+        )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Failed to generate tokens: {e}")
+
+    return CombinedTokenResponse(
+        rtc_token=rtc_token,
+        rtm_token=rtm_token,
+        expire_at=expire_ts,
+        now=now_ts,
+        channel=channel,
+        uid=uid,
+        role=payload.role,
+        user_account=user_account,
+    )
 # ==========================================================
 # Funções auxiliares
 # ==========================================================
@@ -192,14 +266,15 @@ def generate_rtm_token(payload: TokenRequest):
     # 1. Autorização simples (opcional)
     validate_api_key(payload.api_key)
 
-    uid = str(payload.uid)  # RTM usa userId string
-
+    # 2. Validações básicas
     now_ts = int(time.time())
     expire_ts = now_ts + payload.expire_seconds
 
     try:
-        # RTM tradicional usa user_account (string). Vamos usar o UID como string.
-        user_account = str(payload.uid)
+        # RTM usa user_account (string). Preferir payload.user_account quando enviado.
+        user_account = (payload.user_account or str(payload.uid)).strip()
+        if not user_account:
+            raise ValueError("user_account cannot be empty.")
         rtm_token = RtmTokenBuilder.build_token(
             APP_ID,
             APP_CERTIFICATE,
