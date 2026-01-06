@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Agendar DDS Online</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; max-width: 720px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 18px; }
+    label { display:block; margin-top: 12px; font-weight: 600; }
+    input { width:100%; padding:10px; margin-top:6px; box-sizing:border-box; }
+    button { margin-top: 16px; padding: 12px 16px; font-weight: 700; cursor: pointer; }
+    .hint { color:#666; font-size: 13px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Agendar Reunião DDS Online</h1>
+
+  <div class="card">
+    <form method="post" action="/online/agendar" enctype="multipart/form-data">
+      <input type="hidden" name="token" value="{{ token }}"/>
+
+      <label>Data</label>
+      <input type="date" name="data" required value="{{ pref_date }}"/>
+
+      <label>Hora</label>
+      <input type="time" name="hora" required value="{{ pref_time }}"/>
+
+      <label>Assunto</label>
+      <input type="text" name="assunto" required value="{{ pref_subject }}" placeholder="Ex.: NR-10 – Reciclagem"/>
+
+      <label>Host (obrigatório)</label>
+      <input type="text" name="host" required placeholder="Ex.: TEAM1" />
+
+      <label>Cohost (opcional)</label>
+      <input type="text" name="cohost" placeholder="Ex.: E2547" />
+
+      <label>Capa da reunião (imagem)</label>
+      <input type="file" name="capa" accept="image/*" required />
+      <div class="hint">Envie uma imagem (JPG/PNG). Essa capa será salva no Storage.</div>
+
+      <button type="submit">Agendar</button>
+    </form>
+  </div>
+</body>
+</html>

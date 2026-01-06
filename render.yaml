@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: dds-online-form
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn web_app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/secrets/firebase_service_account.json
+      - key: ONLINE_FORM_TOKENS_COLLECTION
+        value: OnlineFormTokens
+      - key: ONLINE_SESSIONS_COLLECTION
+        value: DDS_Sessions

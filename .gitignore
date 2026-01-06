@@ -1,3 +1,18 @@
-.env
-__pycache__/
+# Python / venv
 venv/
+__pycache__/
+*.pyc
+
+# Render / logs
+*.log
+
+# Firebase secrets (NUNCA versionar)
+*service_account*.json
+firebase_config.json
+firebase_service_account.json
+serviceAccountKey.json
+*.p12
+*.pem
+
+# Env files
+.env
